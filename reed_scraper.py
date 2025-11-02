@@ -406,7 +406,8 @@ class ReedScraper:
                 remote.strip(),
                 'Reed',
                 schedule.strip(),
-                salary_rate.strip()])
+                salary_rate.strip(),
+                'London'])
                 
     def _extract_skills(self, job_description):
         """Extract common skills from job description"""
@@ -454,7 +455,7 @@ class ReedScraper:
     def _extract_job_work_from_home(self, job_description):
         jd_lower = job_description.lower()
         
-        return 'True' if 'remote' in jd_lower else 'False'
+        return 'True' if 'remote' in jd_lower or 'hybrid' in jd_lower else 'False'
     
     def _salary_rate(self, salary):
             if 'annum' in salary or 'year' in salary:
@@ -483,7 +484,8 @@ class ReedScraper:
             'remote_work': remote,
             'job_via': 'Reed',
             'schedule': schedule.strip(),
-            'salary_rate': salary_rate.strip()
+            'salary_rate': salary_rate.strip(),
+            'city': 'London'
         })
 
         with open(f'{self.json_filename}', 'w') as f:
@@ -507,7 +509,8 @@ class ReedScraper:
             'Remote Work': [remote.strip() for remote in self.remote_work_jones],
             'Job_via': ['Reed' for i in range(len(self.job_title_jones))],
             'Job_Schedule': [schedule for schedule in self.job_schedule_jones],
-            'Salary_rate': [salary_rate for salary_rate in self.salary_rate_jones]
+            'Salary_rate': [salary_rate for salary_rate in self.salary_rate_jones],
+            'City': 'London'
         })
         
         # Check if file exists
@@ -552,7 +555,7 @@ class ReedScraper:
             return
         seen_jobs = set()  # Track unique job+company+location combinations
         for i in range(1, n_pages+1):
-            url = f'https://www.reed.co.uk/jobs/{job_keyword}-jobs?hideTrainingJobs=true&pageno={i}'
+            url = f'https://www.reed.co.uk/jobs/{job_keyword}-jobs-in-london?hideTrainingJobs=true&pageno={i}'
             try:
                 res = requests.get(url=url)
                 res.raise_for_status()
