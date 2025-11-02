@@ -277,8 +277,20 @@ class ReedScraper:
             ('Senior Software Engineer', ['senior', 'software']),
             ('Senior Software Engineer', ['senior', 'engineer']),
             
+
+            # ========== OTHER ANALYST TYPES (Add before final catch-all) ==========
+
+            ('Financial Analyst', ['financial', 'analyst']),
+            ('Financial Analyst', ['finance', 'analyst']),
+            ('Risk Analyst', ['risk', 'analyst']),
+            ('Operations Analyst', ['operations', 'analyst']),
+            ('Junior Analyst', ['junior', 'analyst']),
+
             # Catch any Data + Analyst combination (non-senior)
             ('Data Analyst', ['data', 'analyst']),
+
+            # Generic analyst (for anything that doesn't fit above)
+            ('Analyst', ['analyst']),
             
             # Catch any Data + Engineer combination (non-senior)
             ('Data Engineer', ['data', 'engineer']),
