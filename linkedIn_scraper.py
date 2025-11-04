@@ -16,7 +16,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
 class LinkedInScraper:
-    def __init__(self, output_filename = 'jobs_indeed', format = 'all'):
+    def __init__(self, output_filename = 'linkedIn_jobs', format = 'all'):
         self.titles = []
         self.companies = []
         self.urls = []
@@ -55,6 +55,274 @@ class LinkedInScraper:
         
         return text.strip()
     
+    def _extract_skills(self, job_description):
+        """Extract common skills from job description"""
+        skills_list = [
+            'python', 'java', 'javascript', 'sql', 'c++', 'c#', 'php', 'ruby', 'swift',
+            'excel', 'powerbi', 'tableau', 'power bi', 'looker', 'qlik',
+            'pandas', 'numpy', 'scikit-learn', 'tensorflow', 'pytorch', 'keras',
+            'machine learning', 'deep learning', 'data analysis', 'data analytics', 
+            'statistical analysis', 'data visualization', 'data mining',
+            'aws', 'azure', 'gcp', 'google cloud', 'docker', 'kubernetes',
+            'spark', 'hadoop', 'hive', 'kafka', 'airflow',
+            'git', 'github', 'gitlab', 'jira', 'agile', 'scrum',
+            'etl', 'data warehousing', 'data modeling', 'database',
+            'mysql', 'postgresql', 'mongodb', 'oracle', 'sql server',
+            'api', 'rest', 'json', 'xml', 'html', 'css',
+            'communication', 'teamwork', 'problem solving', 'analytical'
+        ]
+        
+        found_skills = []
+        jd_lower = job_description.lower()
+        
+        for skill in skills_list:
+            if skill in jd_lower:
+                found_skills.append(skill)
+        
+        return ', '.join(found_skills) if found_skills else 'N/A'
+
+    def _categorize_job_title(self, job_title):
+        """
+        Categorize job title into standardized short titles
+        Uses keyword matching with priority order (specific → general → catch-all)
+        """
+        title_lower = job_title.lower()
+        
+        # Define categories with their keywords (order matters - check specific first!)
+        categories = [
+            # ========== SENIOR POSITIONS (Most Specific First) ==========
+            
+            # Senior Machine Learning
+            ('Senior Machine Learning Engineer', ['senior', 'machine learning', 'engineer']),
+            ('Senior Machine Learning Engineer', ['senior', 'ml', 'engineer']),
+            ('Senior Machine Learning Engineer', ['senior', 'machine learning', 'scientist']),
+            ('Senior Machine Learning Engineer', ['senior', 'mlops']),
+            
+            # Senior Data Science
+            ('Senior Data Scientist', ['senior', 'data scientist']),
+            ('Senior Data Scientist', ['senior', 'data science']),
+            ('Senior Data Scientist', ['senior', 'applied', 'scientist']),
+            ('Senior Data Scientist', ['senior', 'research', 'data']),
+            
+            # Senior Data Engineering
+            ('Senior Data Engineer', ['senior', 'data engineer']),
+            ('Senior Data Engineer', ['senior', 'data engineering']),
+            ('Senior Data Engineer', ['senior', 'analytics', 'engineer']),
+            ('Senior Data Engineer', ['senior', 'etl', 'engineer']),
+            ('Senior Data Engineer', ['senior', 'data platform', 'engineer']),
+            ('Senior Data Engineer', ['senior', 'data pipeline', 'engineer']),
+            
+            # Senior Data Analyst - ALL VARIATIONS
+            ('Senior Data Analyst', ['senior', 'data analyst']),
+            ('Senior Data Analyst', ['senior', 'data quality', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data governance', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'category data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data strategy', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'analytics', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data insights', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data operations', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'marketing', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'financial', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'product', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'customer', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'sales', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'business', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data reporting', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data visualization', 'analyst']),
+            
+            # Senior Business Intelligence
+            ('Senior Business Analyst', ['senior', 'business intelligence', 'analyst']),
+            ('Senior Business Analyst', ['senior', 'bi analyst']),
+            ('Senior Business Analyst', ['senior', 'business analyst']),
+            ('Senior Business Analyst', ['senior', 'business systems', 'analyst']),
+            
+            # Senior Software Engineering
+            ('Senior Software Engineer', ['senior', 'software', 'engineer']),
+            ('Senior Software Engineer', ['senior', 'software', 'developer']),
+            ('Senior Software Engineer', ['senior', 'backend', 'engineer']),
+            ('Senior Software Engineer', ['senior', 'frontend', 'engineer']),
+            ('Senior Software Engineer', ['senior', 'full stack']),
+            ('Senior Software Engineer', ['senior', 'developer']),
+            
+            # ========== LEAD/PRINCIPAL/STAFF POSITIONS ==========
+            
+            ('Lead Data Scientist', ['lead', 'data scientist']),
+            ('Lead Data Scientist', ['staff', 'data scientist']),
+            ('Lead Data Engineer', ['lead', 'data engineer']),
+            ('Lead Data Engineer', ['staff', 'data engineer']),
+            ('Principal Data Scientist', ['principal', 'data scientist']),
+            ('Principal Data Scientist', ['principal', 'scientist']),
+            ('Lead Machine Learning Engineer', ['lead', 'machine learning']),
+            ('Lead Machine Learning Engineer', ['lead', 'ml', 'engineer']),
+            
+            # ========== MACHINE LEARNING ROLES ==========
+            
+            ('Machine Learning Engineer', ['machine learning', 'engineer']),
+            ('Machine Learning Engineer', ['ml', 'engineer']),
+            ('Machine Learning Engineer', ['machine learning', 'scientist']),
+            ('Machine Learning Engineer', ['mlops', 'engineer']),
+            ('Machine Learning Engineer', ['deep learning', 'engineer']),
+            ('AI Engineer', ['ai', 'engineer']),
+            ('AI Engineer', ['artificial intelligence', 'engineer']),
+            ('AI Engineer', ['ai/ml']),
+            
+            # ========== DATA SCIENCE ROLES ==========
+            
+            ('Data Scientist', ['data scientist']),
+            ('Data Scientist', ['data science']),
+            ('Data Scientist', ['applied', 'scientist']),
+            ('Research Scientist', ['research', 'scientist']),
+            ('Research Scientist', ['research', 'data']),
+            
+            # ========== DATA ENGINEERING ROLES ==========
+            
+            ('Data Engineer', ['data engineer']),
+            ('Data Engineer', ['data engineering']),
+            ('Data Engineer', ['etl', 'engineer']),
+            ('Data Engineer', ['data platform', 'engineer']),
+            ('Data Engineer', ['data pipeline', 'engineer']),
+            ('Data Engineer', ['data warehouse', 'engineer']),
+            ('Analytics Engineer', ['analytics', 'engineer']),
+            ('Analytics Engineer', ['analytics engineering']),
+            
+            # ========== DATA ANALYSIS ROLES - ALL VARIATIONS ==========
+            
+            ('Data Analyst', ['data analyst']),
+            ('Data Analyst', ['data quality', 'analyst']),
+            ('Data Analyst', ['data governance', 'analyst']),
+            ('Data Analyst', ['category data', 'analyst']),
+            ('Data Analyst', ['data strategy', 'analyst']),
+            ('Data Analyst', ['analytics', 'analyst']),
+            ('Data Analyst', ['data insights', 'analyst']),
+            ('Data Analyst', ['data operations', 'analyst']),
+            ('Data Analyst', ['marketing', 'data', 'analyst']),
+            ('Data Analyst', ['financial', 'data', 'analyst']),
+            ('Data Analyst', ['product', 'data', 'analyst']),
+            ('Data Analyst', ['customer', 'data', 'analyst']),
+            ('Data Analyst', ['sales', 'data', 'analyst']),
+            ('Data Analyst', ['business', 'data', 'analyst']),
+            ('Data Analyst', ['data reporting', 'analyst']),
+            ('Data Analyst', ['data visualization', 'analyst']),
+            ('Data Analyst', ['data analytics']),
+            
+            # Business Intelligence
+            ('Business Intelligence Analyst', ['business intelligence', 'analyst']),
+            ('Business Intelligence Analyst', ['bi analyst']),
+            ('Business Intelligence Analyst', ['business intelligence']),
+            ('Business Intelligence Analyst', ['bi developer']),
+            
+            # ========== BUSINESS ANALYST ROLES ==========
+            
+            ('Business Analyst', ['business analyst']),
+            ('Business Analyst', ['business systems', 'analyst']),
+            ('Business Analyst', ['functional', 'analyst']),
+            ('Business Analyst', ['process', 'analyst']),
+            
+            # ========== QUANTITATIVE ROLES ==========
+            
+            ('Quantitative Analyst', ['quantitative', 'analyst']),
+            ('Quantitative Analyst', ['quant', 'analyst']),
+            ('Quantitative Analyst', ['quantitative', 'researcher']),
+            ('Quantitative Analyst', ['quant', 'developer']),
+            
+            # ========== SOFTWARE ENGINEERING ROLES ==========
+            
+            ('Software Engineer', ['software', 'engineer']),
+            ('Software Engineer', ['software', 'developer']),
+            ('Backend Engineer', ['backend', 'engineer']),
+            ('Backend Engineer', ['back-end', 'engineer']),
+            ('Frontend Engineer', ['frontend', 'engineer']),
+            ('Frontend Engineer', ['front-end', 'engineer']),
+            ('Full Stack Engineer', ['full stack']),
+            ('Full Stack Engineer', ['fullstack']),
+            ('DevOps Engineer', ['devops']),
+            ('DevOps Engineer', ['dev ops']),
+            ('DevOps Engineer', ['site reliability', 'engineer']),
+            ('DevOps Engineer', ['sre']),
+            
+            # ========== CLOUD ROLES ==========
+            
+            ('Cloud Engineer', ['cloud', 'engineer']),
+            ('Cloud Engineer', ['cloud', 'developer']),
+            ('Cloud Architect', ['cloud', 'architect']),
+            ('Cloud Architect', ['solutions', 'architect', 'cloud']),
+            
+            # ========== ARCHITECT ROLES ==========
+            
+            ('Data Architect', ['data', 'architect']),
+            ('Solutions Architect', ['solutions', 'architect']),
+            ('Enterprise Architect', ['enterprise', 'architect']),
+            
+            # ========== CATCH-ALL PATTERNS (Ordered by Priority) ==========
+            # These catch anything we missed with specific patterns
+            
+            # Catch any Senior + Data + Analyst combination
+            ('Senior Data Analyst', ['senior', 'data', 'analyst']),
+            
+            # Catch any Senior + Data + Engineer combination
+            ('Senior Data Engineer', ['senior', 'data', 'engineer']),
+            
+            # Catch any Senior + Data + Scientist combination
+            ('Senior Data Scientist', ['senior', 'data', 'scientist']),
+            
+            # Catch any Senior + ML/Machine Learning combination
+            ('Senior Machine Learning Engineer', ['senior', 'machine', 'learning']),
+            ('Senior Machine Learning Engineer', ['senior', 'ml']),
+            
+            # Catch any Senior + Software/Developer combination
+            ('Senior Software Engineer', ['senior', 'software']),
+            ('Senior Software Engineer', ['senior', 'engineer']),
+            
+
+            # ========== OTHER ANALYST TYPES (Add before final catch-all) ==========
+
+            ('Financial Analyst', ['financial', 'analyst']),
+            ('Financial Analyst', ['finance', 'analyst']),
+            ('Risk Analyst', ['risk', 'analyst']),
+            ('Operations Analyst', ['operations', 'analyst']),
+            ('Junior Analyst', ['junior', 'analyst']),
+
+            # Catch any Data + Analyst combination (non-senior)
+            ('Data Analyst', ['data', 'analyst']),
+
+            # Generic analyst (for anything that doesn't fit above)
+            ('Analyst', ['analyst']),
+            
+            # Catch any Data + Engineer combination (non-senior)
+            ('Data Engineer', ['data', 'engineer']),
+            
+            # Catch any Data + Scientist combination (non-senior)
+            ('Data Scientist', ['data', 'scientist']),
+            
+            # Catch any ML/Machine Learning Engineer (non-senior)
+            ('Machine Learning Engineer', ['machine', 'learning']),
+            ('Machine Learning Engineer', ['ml']),
+            
+            # Catch any AI-related roles
+            ('AI Engineer', ['ai']),
+            ('AI Engineer', ['artificial', 'intelligence']),
+            
+            # Catch any Business Analyst variations
+            ('Business Analyst', ['business', 'analyst']),
+            
+            # Catch any Software Engineer variations
+            ('Software Engineer', ['software']),
+            ('Software Engineer', ['developer']),
+            ('Software Engineer', ['engineer']),
+        ]
+        
+        # Check each category
+        for category_name, keywords in categories:
+            # Check if ALL keywords are in the title
+            if all(keyword in title_lower for keyword in keywords):
+                return category_name
+        
+        # If no match found, return "Other"
+        return 'Other'
+    
+    def _shortening_titles(self):
+        for title in self.titles:
+            self.job_title_short.append(self._categorize_job_title(title))
 
     def scrape_jobs(self, job_keyword):
         #self.clear_data()  # ADD THIS LINE
@@ -102,7 +370,7 @@ class LinkedInScraper:
         # Scroll until button is visible
         see_more_button = scroll_until_button_visible(browser)
 
-        for i in range(10): # can do more than 10 if you want more jobs, this was approx 180 jobs, there were 9k total and we will get there, believe
+        for i in range(1): # can do more than 10 if you want more jobs, this was approx 180 jobs, there were 9k total and we will get there, believe
             if see_more_button:
                 # Click the button if you want to load more jobs
                 see_more_button.click()
@@ -113,6 +381,7 @@ class LinkedInScraper:
 
             for elem in textelem:
                 self.titles.append(elem.text)
+                
         except:
             textelem = []
 
@@ -141,6 +410,7 @@ class LinkedInScraper:
             urlelem = []
 
         unique_jobs = []
+        
         for t, c, u, l in zip(self.titles, self.companies, self.urls, self.locations):
             job_id = f"{self.normalize(t)}_{self.normalize(c)}_{self.normalize(l)}"
             if job_id not in seen_jobs:
@@ -148,6 +418,7 @@ class LinkedInScraper:
                 unique_jobs.append((t, c, l, u))
 
             # Update lists with unique jobs only
+            
             self.titles = [job[0] for job in unique_jobs]
             self.companies = [job[1] for job in unique_jobs]
             self.locations = [job[2] for job in unique_jobs]
@@ -199,6 +470,26 @@ class LinkedInScraper:
                 descelem = browser.find_elements(By.CSS_SELECTOR, 'div.show-more-less-html__markup.relative.overflow-hidden')
                 cleaned_desc = self.clean_text(descelem[0].text)
                 self.job_description.append(cleaned_desc)
+                skills = self._extract_skills(cleaned_desc)
+                self.job_skills.append(skills)
+        
+
+                try:
+                    sal = browser.find_element(By.CSS_SELECTOR, "div.salary.compensation__salary")
+                    sal_text = sal.text
+                    print(sal_text)
+                    self.salary.append(sal_text)
+                except:
+                    self.salary.append("Competitive Salary")
+
+                try:
+                    schedule = browser.find_elements(By.CSS_SELECTOR, "span.description__job-criteria-text.description__job-criteria-text--criteria")
+                    schedule_text = schedule[1].text
+                    print(schedule_text)
+                    self.schedule.append(schedule_text)
+                except:
+                    self.schedule.append("Full-time")
+ 
                 
             except:
                 print(f"Failed to load job description for {u}")
@@ -206,6 +497,31 @@ class LinkedInScraper:
                 self.job_skills.append("N/A")
 
         browser.quit()
+
+    def _save_to_excel(self):
+        excel_filename = self.output_filename + '.xlsx'
+        
+        new_df = pd.DataFrame({
+            'Title': [title.strip() for title in self.titles],
+            'Title_Short':[st.strip() for st in self.job_title_short],
+            'Company': [company.strip() for company in self.companies],
+            'Location': [loca.strip() for loca in self.locations],
+            'URL': [url.strip() for url in self.urls],
+            'Job Description': [desc.strip() for desc in self.job_description],
+            'Skills': [skills.strip() for skills in self.job_skills],
+            'Salary': [sal.strip() for sal in self.salary],
+            'Job_Schedule': [js.strip() for js in self.schedule]
+        })
+        
+        if os.path.exists(excel_filename):
+            existing_df = pd.read_excel(excel_filename, engine='openpyxl')
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            combined_df = combined_df.drop_duplicates(subset=['Title', 'Company'], keep='first')
+            combined_df.to_excel(excel_filename, index=False, engine='openpyxl')
+            print(f'Appended to {excel_filename}. Total jobs: {len(combined_df)}')
+        else:
+            new_df.to_excel(excel_filename, index=False, engine='openpyxl')
+            print(f'Created {excel_filename} with {len(new_df)} jobs')
 
         
 if __name__ == '__main__':
@@ -219,7 +535,13 @@ if __name__ == '__main__':
     print(len(scraper.urls))
 
     scraper.jd_extraction()
+    scraper._shortening_titles()
     print(len(scraper.job_description))
+    print(len(scraper.schedule))
+    print(len(scraper.salary))
+    print(len(scraper.job_title_short))
+    print(len(scraper.job_skills))
+    scraper._save_to_excel()
 
 
 # <div class="show-more-less-html__markup relative overflow-hidden">
