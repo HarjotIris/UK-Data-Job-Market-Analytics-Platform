@@ -32,6 +32,7 @@ class LinkedInScraper:
         self.health_insurance = []
         self.work_from_home = []
         self.schedule = []
+        self.salary_rate = []
 
     def normalize(self, text):
         return re.sub(r'[^a-z0-9]', '', text.lower().strip())
@@ -55,6 +56,36 @@ class LinkedInScraper:
         
         return text.strip()
     
+    def _extract_degree(self, job_description):
+        degree_list = ['bachelor\'s', 'master\'s', 'bachelors', 'masters']
+        vague_list = ['relevant degree', 'degree']
+        jd_lower = job_description.lower()
+        
+        for degree in degree_list:
+            if degree in jd_lower:
+                return degree
+        for val in vague_list:
+            if val in jd_lower:
+                return 'degree mentioned vaguely'
+        return 'No degree mentioned'
+    
+    def _extract_job_health_insurance_info(self, job_description):
+        jd_lower = job_description.lower()
+        return 'True' if 'health insurance' in jd_lower else 'False'
+    
+    def _extract_job_work_from_home(self, job_description):
+        jd_lower = job_description.lower()
+        
+        return 'True' if 'remote' in jd_lower or 'hybrid' in jd_lower else 'False'
+    
+    def _salary_rate(self, salary):
+            if 'annum' in salary or 'year' in salary:
+                return 'yearly'
+            elif 'hour' in salary or 'hourly' in salary:
+                return 'hourly'
+            else:
+                return 'Not applicable'
+   
     def _extract_skills(self, job_description):
         """Extract common skills from job description"""
         skills_list = [
@@ -472,6 +503,14 @@ class LinkedInScraper:
                 self.job_description.append(cleaned_desc)
                 skills = self._extract_skills(cleaned_desc)
                 self.job_skills.append(skills)
+
+                degree = self._extract_degree(cleaned_desc)
+                self.degree.append(degree)
+                health_ins = self._extract_job_health_insurance_info(cleaned_desc)
+                self.health_insurance.append(health_ins)
+
+                remote = self._extract_job_work_from_home(cleaned_desc)
+                self.work_from_home.append(remote)
         
 
                 try:
@@ -479,8 +518,11 @@ class LinkedInScraper:
                     sal_text = sal.text
                     print(sal_text)
                     self.salary.append(sal_text)
+                    s_rate = self._salary_rate(sal_text)
+                    self.salary_rate.append(s_rate)
                 except:
                     self.salary.append("Competitive Salary")
+                    self.salary_rate.append("yearly")
 
                 try:
                     schedule = browser.find_elements(By.CSS_SELECTOR, "span.description__job-criteria-text.description__job-criteria-text--criteria")
@@ -510,7 +552,13 @@ class LinkedInScraper:
             'Job Description': [desc.strip() for desc in self.job_description],
             'Skills': [skills.strip() for skills in self.job_skills],
             'Salary': [sal.strip() for sal in self.salary],
-            'Job_Schedule': [js.strip() for js in self.schedule]
+            'Job_Health_Insurance': [j.strip() for j in self.health_insurance],
+            'Degree': [d.strip() for d in self.degree],
+            'Remote Work': [r.strip() for r in self.work_from_home],
+            'Job_via': 'LinkedIn',
+            'Job_Schedule': [js.strip() for js in self.schedule],
+            'Salary_rate': [rate.strip() for rate in self.salary_rate],
+            'City': 'London'
         })
         
         if os.path.exists(excel_filename):
@@ -541,6 +589,10 @@ if __name__ == '__main__':
     print(len(scraper.salary))
     print(len(scraper.job_title_short))
     print(len(scraper.job_skills))
+    print(len(scraper.health_insurance))
+    print(len(scraper.degree))
+    print(len(scraper.work_from_home))
+    print(len(scraper.salary_rate))
     scraper._save_to_excel()
 
 
