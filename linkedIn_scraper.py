@@ -351,12 +351,24 @@ class LinkedInScraper:
         # If no match found, return "Other"
         return 'Other'
     
+    def clear_data(self):
+        self.titles = []
+        self.companies = []
+        self.urls = []
+        self.job_description = []
+        self.job_skills = []
+        self.job_title_short = []
+        self.locations = []
+        self.salary = []
+        self.schedule = []
+        self.salary_rate = []
+    
     def _shortening_titles(self):
         for title in self.titles:
             self.job_title_short.append(self._categorize_job_title(title))
 
     def scrape_jobs(self, job_keyword):
-        #self.clear_data()  # ADD THIS LINE
+        self.clear_data()  # ADD THIS LINE
         seen_jobs = set()
         browser = webdriver.Firefox(options=options)
         # geoId is fixed here for london area, can change for other places
@@ -540,6 +552,61 @@ class LinkedInScraper:
 
         browser.quit()
 
+    def _save_to_csv(self):
+        import csv
+        try:
+            with open(self.output_filename + '.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Title', 'Title_Short' 'Company', 'Location', 'URL', 'Job Description', 'Skills', 'Salary', 'Job_Health_Insurance', 'Degree', 'Remote Work', 'Job_via', 'Job_Schedule', 'Salary_rate', 'City'])
+                for title, title_short, company, loca, u, desc, skills, salary, hinsurance, degree, remote, schedule, rate in zip(self.titles, self.job_title_short, self.companies, self.locations, self.urls, self.job_description, self.job_skills, self.salary, self.health_insurance, self.degree, self.work_from_home, self.schedule, self.salary_rate):
+                    writer.writerow([
+                        title.strip(),
+                        title_short.strip(),
+                        company.strip(),
+                        loca.strip(),
+                        u.strip(),
+                        desc.strip(),
+                        skills.strip(),
+                        salary.strip(),
+                        hinsurance.strip(),
+                        degree.strip(),
+                        remote.strip(),
+                        'LinkedIn',
+                        schedule.strip(),
+                        rate.strip(),
+                        'London'
+                    ])
+            print(f"Saved to {self.output_filename}")
+        except Exception as e:
+            print(f'Error saving to csv: {e}')
+
+    def _save_to_json(self):
+        data = []
+        json_filename = self.output_filename + '.json'
+        for title, title_short, company, loca, u, desc, skills, salary, hinsurance, degree, remote, schedule, rate in zip(self.titles, self.job_title_short, self.companies, self.locations, self.urls, self.job_description, self.job_skills, self.salary, self.health_insurance, self.degree, self.work_from_home, self.schedule, self.salary_rate):
+            data.append({
+                'title': title.strip(),
+                'title_short': title_short.strip(),
+                'company': company.strip(),
+                'locations': loca.strip(),
+                'job_url': u.strip(),
+                'job_description': desc.strip(),
+                'skills': skills.strip(),
+                'salary': salary.strip(),
+                'health_insurancce': hinsurance.strip(),
+                'degree': degree.strip(),
+                'work_from_home': remote.strip(),
+                'job_via': 'LinkedIn',
+                'schedule': schedule.strip(),
+                'salary_rate': rate.strip(),
+                'city': 'London'
+                
+            })
+        
+        with open(json_filename, 'w') as f:
+            json.dump(data, f, indent=4)
+        print(f"Saved to {json_filename}")
+
     def _save_to_excel(self):
         excel_filename = self.output_filename + '.xlsx'
         
@@ -573,27 +640,36 @@ class LinkedInScraper:
 
         
 if __name__ == '__main__':
-    scraper = LinkedInScraper()
-    job_keyword = 'data analyst'
+    parser = argparse.ArgumentParser(description='Scraper CLI')
+
+    parser.add_argument('--filename', default='jobs', help='Name of the output file without any extensions')
+    parser.add_argument('--job_keyword', nargs='+', required=True, help='Enter the job keyword you want to search within quotes')
+    parser.add_argument('--format', choices=['csv', 'json', 'excel', 'pandas', 'all'], default='all', help='Output format')
+    args = parser.parse_args()
+    scraper = LinkedInScraper(output_filename=args.filename, format=args.format)
+    job_keyword = ' '.join(args.job_keyword)
     scraper.scrape_jobs(job_keyword=job_keyword)
 
-    print(len(scraper.titles))
-    print(len(scraper.companies))
-    print(len(scraper.locations))
-    print(len(scraper.urls))
+    
 
     scraper.jd_extraction()
     scraper._shortening_titles()
-    print(len(scraper.job_description))
-    print(len(scraper.schedule))
-    print(len(scraper.salary))
-    print(len(scraper.job_title_short))
-    print(len(scraper.job_skills))
-    print(len(scraper.health_insurance))
-    print(len(scraper.degree))
-    print(len(scraper.work_from_home))
-    print(len(scraper.salary_rate))
-    scraper._save_to_excel()
+    
+    if args.format == 'csv':
+        scraper._save_to_csv()
+    elif args.format == 'json':
+        scraper._save_to_json()
+    elif args.format == 'excel':
+        scraper._save_to_excel()
+    elif args.format == 'pandas':
+        scraper._save_to_csv()
+        scraper._save_to_json()
+    else:  # 'all'
+        scraper._save_to_csv()
+        scraper._save_to_json()
+        scraper._save_to_excel()
+
+    print(f"\nScraping complete! Found {len(scraper.titles)} jobs.")
 
 
 # <div class="show-more-less-html__markup relative overflow-hidden">
