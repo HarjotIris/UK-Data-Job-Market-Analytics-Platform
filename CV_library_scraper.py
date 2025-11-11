@@ -64,45 +64,56 @@ class CVScraper:
         browser.get(url)
 
         try:
-            textelem = browser.find_elements(By.CSS_SELECTOR, 'h2.job__title')
-            for elem in textelem:
-                self.titles.append(elem.text)
-        except:
-            textelem = []
-        #print(len(self.titles))
-        try:
-            companyelem = browser.find_elements(By.CSS_SELECTOR, 'a.job__company-link')
-            #count = 0
-            totalelems = []
-            for elem in companyelem:
-                if elem.text:
-                    totalelems.append(elem.text)
-            for i in range(len(totalelems)):
-                if (i >= 2 and i <= 4) or (i >= 7 and i <= 9):
-                    continue
-                self.companies.append(totalelems[i])
-            #print(count)
-        except:
-            companyelem = []
+            textelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.job__main')
+            
+            for textelem in textelem_list:
+                try:
+                    titleelem_list = textelem.find_elements(By.CSS_SELECTOR, 'h2.job__title')
+                    for elem in titleelem_list:
+                        self.titles.append(elem.text)
+                except Exception as e:
+                    print(f"Error finding title: {e}")
 
-        try:
-            locaelem = browser.find_elements(By.CSS_SELECTOR, 'span.job__details-location')
-            for elem in locaelem:
-                self.locations.append(elem.text)
-        except:
-            locaelem = []
+                try:
+                    companyelem_list = textelem.find_elements(By.CSS_SELECTOR, 'a.job__company-link')
+                    totalelems = []
+                    for elem in companyelem_list:
+                        if elem.text:
+                            totalelems.append(elem.text)
+                    for i in range(len(totalelems)):
+                        if (i >= 2 and i <= 4) or (i >= 7 and i <= 9):
+                            continue
+                        self.companies.append(totalelems[i])
+                except Exception as e:
+                    print(f"Error finding comapny: {e}")
 
-        try:
-            urlelem = browser.find_elements(By.CSS_SELECTOR, 'h2.job__title a')
+                try:
+                    locaelem_list = textelem.find_elements(By.CSS_SELECTOR, 'span.job__details-location')
+                    for elem in locaelem_list:
+                        self.locations.append(elem.text)
+                except Exception as e:
+                    print(f"Error finding title: {e}")
 
-            for u in urlelem:
-                self.urls.append(u.get_attribute('href'))
-            print(len(self.urls))
-        except:
-            urlelem = []
+                try:
+                    urlelem_list = textelem.find_elements(By.CSS_SELECTOR, 'h2.job__title a')
+                    for u in urlelem_list:
+                        self.urls.append(u.get_attribute('href'))
+                except Exception as e:
+                    print(f"Error finding title: {e}")
+
+                try:
+                    salelem_list = textelem.find_elements(By.CSS_SELECTOR, 'dd.job__details-value.salary')
+                    if salelem_list:
+                        self.salary.append(salelem_list[0].text)
+                    else:
+                        self.salary.append("Competitive Salary")
+                except Exception as e:
+                    print(f"Error finding title: {e}")
+                    self.salary.append("Competitive Salary")
+
+        except Exception as e:
+            print(f"Error finding job__main: {e}")
         
-        
-
         unique_jobs = []
         for t, c, u, l in zip(self.titles, self.companies, self.urls, self.locations):
             job_id = f"{self.normalize(t)}_{self.normalize(c)}_{self.normalize(l)}"
@@ -133,13 +144,13 @@ class CVScraper:
                 normaldescelem = browser.find_elements(By.CSS_SELECTOR, 'div.job__description')
                 cleaned_desc = self.clean_text(normaldescelem[0].text)
                 self.job_description.append(cleaned_desc)
+                
 
             except:
                 print(f"Failed to load job description for {u}")
                 self.job_description.append("Description not available")
                 self.job_skills.append("N/A")
         
-
 if __name__ == '__main__':
     scraper = CVScraper(output_filename="cv_scraper")
     job_keyword = "Data Analyst"
@@ -154,8 +165,5 @@ if __name__ == '__main__':
     print(len(scraper.companies))
     print(len(scraper.locations))
     print(len(scraper.urls))
+    print(len(scraper.salary))
     print(len(scraper.job_description))
-
-    for desc in scraper.job_description:
-        print(desc)
-    
