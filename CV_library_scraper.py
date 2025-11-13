@@ -470,11 +470,6 @@ class CVScraper:
         self.salary_rate = unique_salary_rates
         self.schedule = unique_schedules
         
-    
-        
-
-
-
     def jd_extraction(self):
         browser = webdriver.Firefox(options=options)
         for u in self.urls:
@@ -516,7 +511,7 @@ class CVScraper:
                 print(f"Failed to load job description for {u}")
                 self.job_description.append("Description not available")
                 self.job_skills.append("N/A")
-                self.degree.append("N/A")  # Add these too
+                self.degree.append("N/A")  
                 self.health_insurance.append("N/A")
                 self.work_from_home.append("N/A")
 

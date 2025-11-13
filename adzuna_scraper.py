@@ -33,64 +33,509 @@ class AdzunaScraper:
         self.schedule = []
         self.salary_rate = []
 
-    def scrape_jobs(self, job_keyword, n_pages):
-
-        url = f'https://www.adzuna.co.uk/jobs/search?loc=86384&q={job_keyword}&p={n_pages}'
-        browser = webdriver.Firefox(options=options)
-        browser.get(url)
-
-        titleelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
-
-        for title in titleelem_list:
-            if title.text:
-                self.titles.append(title.text)
-
-        companyelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-company')
-
-        for company in companyelem_list:
-            self.companies.append(company.text)
-
-        sal_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-salary')
-
-        for sal in sal_list:
-            match = re.search(r'(£[\d,]+)', sal.text)
-            if match:
-                value = match.group(1)
-                self.salary.append(value)
-
-        locaelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-location')
-        for loca in locaelem_list:
-            temp = loca.text
-            res = ''
-            for i in range(len(temp)):
-                if temp[i] == ' ' and i > 0 and temp[i-1] == ' ' or temp[i] == '+':
-                    break
-                else:
-                    res += temp[i]
-            if res:
-                cleaned = re.sub(r'[\r\n]+', '', res)
-                self.locations.append(cleaned.rstrip(','))
-
-        urlelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
-        for u in urlelem_list:
-            
-            temp = u.get_attribute('href')
-            if self.urls and temp != self.urls[-1]:
-                self.urls.append(temp)
-            elif not self.urls:
-                self.urls.append(temp)
+    def normalize(self, text):
+        return re.sub(r'[^a-z0-9]', '', text.lower().strip())
+    
+    def clean_text(self, text):
+        """Clean text of problematic characters and encoding issues"""
+        if not text:
+            return ""
+        
+        text = unicodedata.normalize('NFKD', text)
+        text = text.replace('\u00a0', ' ')
+        text = text.replace('\u2013', '-')
+        text = text.replace('\u2014', '-')
+        text = text.replace('\u2018', "'")
+        text = text.replace('\u2019', "'")
+        text = text.replace('\u201c', '"')
+        text = text.replace('\u201d', '"')
+        text = text.replace('\u00e9', 'e')
+        text = text.replace('\u00f1', 'n')
+        text = ''.join(char for char in text if char.isprintable() or char in ['\n', '\t'])
+        
+        return text.strip()
+    
+    def _extract_degree(self, job_description):
+        degree_list = ['bachelor\'s', 'master\'s', 'bachelors', 'masters']
+        vague_list = ['relevant degree', 'degree']
+        jd_lower = job_description.lower()
+        
+        for degree in degree_list:
+            if degree in jd_lower:
+                return degree
+        for val in vague_list:
+            if val in jd_lower:
+                return 'degree mentioned vaguely'
+        return 'No degree mentioned'
+    
+    def _extract_job_health_insurance_info(self, job_description):
+        jd_lower = job_description.lower()
+        return 'True' if 'health insurance' in jd_lower else 'False'
+    
+    def _extract_job_work_from_home(self, job_description):
+        jd_lower = job_description.lower()
+        
+        return 'True' if 'remote' in jd_lower or 'hybrid' in jd_lower else 'False'
+    
+    def _salary_rate(self, salary):
+            if 'annum' in salary or 'year' in salary:
+                return 'yearly'
+            elif 'hour' in salary or 'hourly' in salary:
+                return 'hourly'
+            elif 'day' in salary or 'daily' in salary:
+                return 'daily'
             else:
-                continue
-        for title, company, loca, u, sal in zip(self.titles, self.companies, self.locations, self.urls, self.salary):
-            print(title)
-            print(company)
-            print(loca)
-            print(u)
-            print(sal)
-            print("="*50)
+                return 'Not applicable'
+            
+    def _extract_skills(self, job_description):
+        """Extract common skills from job description"""
+        skills_list = [
+            'python', 'java', 'javascript', 'sql', 'c++', 'c#', 'php', 'ruby', 'swift',
+            'excel', 'powerbi', 'tableau', 'power bi', 'looker', 'qlik',
+            'pandas', 'numpy', 'scikit-learn', 'tensorflow', 'pytorch', 'keras',
+            'machine learning', 'deep learning', 'data analysis', 'data analytics', 
+            'statistical analysis', 'data visualization', 'data mining',
+            'aws', 'azure', 'gcp', 'google cloud', 'docker', 'kubernetes',
+            'spark', 'hadoop', 'hive', 'kafka', 'airflow',
+            'git', 'github', 'gitlab', 'jira', 'agile', 'scrum',
+            'etl', 'data warehousing', 'data modeling', 'database',
+            'mysql', 'postgresql', 'mongodb', 'oracle', 'sql server',
+            'api', 'rest', 'json', 'xml', 'html', 'css',
+            'communication', 'teamwork', 'problem solving', 'analytical'
+        ]
+        
+        found_skills = []
+        jd_lower = job_description.lower()
+        
+        for skill in skills_list:
+            if skill in jd_lower:
+                found_skills.append(skill)
+        
+        return ', '.join(found_skills) if found_skills else 'N/A'
+    
+    def _categorize_job_title(self, job_title):
+        """
+        Categorize job title into standardized short titles
+        Uses keyword matching with priority order (specific → general → catch-all)
+        """
+        title_lower = job_title.lower()
+        
+        # Define categories with their keywords (order matters - check specific first!)
+        categories = [
+            # ========== SENIOR POSITIONS (Most Specific First) ==========
+            
+            # Senior Machine Learning
+            ('Senior Machine Learning Engineer', ['senior', 'machine learning', 'engineer']),
+            ('Senior Machine Learning Engineer', ['senior', 'ml', 'engineer']),
+            ('Senior Machine Learning Engineer', ['senior', 'machine learning', 'scientist']),
+            ('Senior Machine Learning Engineer', ['senior', 'mlops']),
+            
+            # Senior Data Science
+            ('Senior Data Scientist', ['senior', 'data scientist']),
+            ('Senior Data Scientist', ['senior', 'data science']),
+            ('Senior Data Scientist', ['senior', 'applied', 'scientist']),
+            ('Senior Data Scientist', ['senior', 'research', 'data']),
+            
+            # Senior Data Engineering
+            ('Senior Data Engineer', ['senior', 'data engineer']),
+            ('Senior Data Engineer', ['senior', 'data engineering']),
+            ('Senior Data Engineer', ['senior', 'analytics', 'engineer']),
+            ('Senior Data Engineer', ['senior', 'etl', 'engineer']),
+            ('Senior Data Engineer', ['senior', 'data platform', 'engineer']),
+            ('Senior Data Engineer', ['senior', 'data pipeline', 'engineer']),
+            
+            # Senior Data Analyst - ALL VARIATIONS
+            ('Senior Data Analyst', ['senior', 'data analyst']),
+            ('Senior Data Analyst', ['senior', 'data quality', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data governance', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'category data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data strategy', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'analytics', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data insights', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data operations', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'marketing', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'financial', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'product', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'customer', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'sales', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'business', 'data', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data reporting', 'analyst']),
+            ('Senior Data Analyst', ['senior', 'data visualization', 'analyst']),
+            
+            # Senior Business Intelligence
+            ('Senior Business Analyst', ['senior', 'business intelligence', 'analyst']),
+            ('Senior Business Analyst', ['senior', 'bi analyst']),
+            ('Senior Business Analyst', ['senior', 'business analyst']),
+            ('Senior Business Analyst', ['senior', 'business systems', 'analyst']),
+            
+            # Senior Software Engineering
+            ('Senior Software Engineer', ['senior', 'software', 'engineer']),
+            ('Senior Software Engineer', ['senior', 'software', 'developer']),
+            ('Senior Software Engineer', ['senior', 'backend', 'engineer']),
+            ('Senior Software Engineer', ['senior', 'frontend', 'engineer']),
+            ('Senior Software Engineer', ['senior', 'full stack']),
+            ('Senior Software Engineer', ['senior', 'developer']),
+            
+            # ========== LEAD/PRINCIPAL/STAFF POSITIONS ==========
+            
+            ('Lead Data Scientist', ['lead', 'data scientist']),
+            ('Lead Data Scientist', ['staff', 'data scientist']),
+            ('Lead Data Engineer', ['lead', 'data engineer']),
+            ('Lead Data Engineer', ['staff', 'data engineer']),
+            ('Principal Data Scientist', ['principal', 'data scientist']),
+            ('Principal Data Scientist', ['principal', 'scientist']),
+            ('Lead Machine Learning Engineer', ['lead', 'machine learning']),
+            ('Lead Machine Learning Engineer', ['lead', 'ml', 'engineer']),
+            
+            # ========== MACHINE LEARNING ROLES ==========
+            
+            ('Machine Learning Engineer', ['machine learning', 'engineer']),
+            ('Machine Learning Engineer', ['ml', 'engineer']),
+            ('Machine Learning Engineer', ['machine learning', 'scientist']),
+            ('Machine Learning Engineer', ['mlops', 'engineer']),
+            ('Machine Learning Engineer', ['deep learning', 'engineer']),
+            ('AI Engineer', ['ai', 'engineer']),
+            ('AI Engineer', ['artificial intelligence', 'engineer']),
+            ('AI Engineer', ['ai/ml']),
+            
+            # ========== DATA SCIENCE ROLES ==========
+            
+            ('Data Scientist', ['data scientist']),
+            ('Data Scientist', ['data science']),
+            ('Data Scientist', ['applied', 'scientist']),
+            ('Research Scientist', ['research', 'scientist']),
+            ('Research Scientist', ['research', 'data']),
+            
+            # ========== DATA ENGINEERING ROLES ==========
+            
+            ('Data Engineer', ['data engineer']),
+            ('Data Engineer', ['data engineering']),
+            ('Data Engineer', ['etl', 'engineer']),
+            ('Data Engineer', ['data platform', 'engineer']),
+            ('Data Engineer', ['data pipeline', 'engineer']),
+            ('Data Engineer', ['data warehouse', 'engineer']),
+            ('Analytics Engineer', ['analytics', 'engineer']),
+            ('Analytics Engineer', ['analytics engineering']),
+            
+            # ========== DATA ANALYSIS ROLES - ALL VARIATIONS ==========
+            
+            ('Data Analyst', ['data analyst']),
+            ('Data Analyst', ['data quality', 'analyst']),
+            ('Data Analyst', ['data governance', 'analyst']),
+            ('Data Analyst', ['category data', 'analyst']),
+            ('Data Analyst', ['data strategy', 'analyst']),
+            ('Data Analyst', ['analytics', 'analyst']),
+            ('Data Analyst', ['data insights', 'analyst']),
+            ('Data Analyst', ['data operations', 'analyst']),
+            ('Data Analyst', ['marketing', 'data', 'analyst']),
+            ('Data Analyst', ['financial', 'data', 'analyst']),
+            ('Data Analyst', ['product', 'data', 'analyst']),
+            ('Data Analyst', ['customer', 'data', 'analyst']),
+            ('Data Analyst', ['sales', 'data', 'analyst']),
+            ('Data Analyst', ['business', 'data', 'analyst']),
+            ('Data Analyst', ['data reporting', 'analyst']),
+            ('Data Analyst', ['data visualization', 'analyst']),
+            ('Data Analyst', ['data analytics']),
+            
+            # Business Intelligence
+            ('Business Intelligence Analyst', ['business intelligence', 'analyst']),
+            ('Business Intelligence Analyst', ['bi analyst']),
+            ('Business Intelligence Analyst', ['business intelligence']),
+            ('Business Intelligence Analyst', ['bi developer']),
+            
+            # ========== BUSINESS ANALYST ROLES ==========
+            
+            ('Business Analyst', ['business analyst']),
+            ('Business Analyst', ['business systems', 'analyst']),
+            ('Business Analyst', ['functional', 'analyst']),
+            ('Business Analyst', ['process', 'analyst']),
+            
+            # ========== QUANTITATIVE ROLES ==========
+            
+            ('Quantitative Analyst', ['quantitative', 'analyst']),
+            ('Quantitative Analyst', ['quant', 'analyst']),
+            ('Quantitative Analyst', ['quantitative', 'researcher']),
+            ('Quantitative Analyst', ['quant', 'developer']),
+            
+            # ========== SOFTWARE ENGINEERING ROLES ==========
+            
+            ('Software Engineer', ['software', 'engineer']),
+            ('Software Engineer', ['software', 'developer']),
+            ('Backend Engineer', ['backend', 'engineer']),
+            ('Backend Engineer', ['back-end', 'engineer']),
+            ('Frontend Engineer', ['frontend', 'engineer']),
+            ('Frontend Engineer', ['front-end', 'engineer']),
+            ('Full Stack Engineer', ['full stack']),
+            ('Full Stack Engineer', ['fullstack']),
+            ('DevOps Engineer', ['devops']),
+            ('DevOps Engineer', ['dev ops']),
+            ('DevOps Engineer', ['site reliability', 'engineer']),
+            ('DevOps Engineer', ['sre']),
+            
+            # ========== CLOUD ROLES ==========
+            
+            ('Cloud Engineer', ['cloud', 'engineer']),
+            ('Cloud Engineer', ['cloud', 'developer']),
+            ('Cloud Architect', ['cloud', 'architect']),
+            ('Cloud Architect', ['solutions', 'architect', 'cloud']),
+            
+            # ========== ARCHITECT ROLES ==========
+            
+            ('Data Architect', ['data', 'architect']),
+            ('Solutions Architect', ['solutions', 'architect']),
+            ('Enterprise Architect', ['enterprise', 'architect']),
+            
+            # ========== CATCH-ALL PATTERNS (Ordered by Priority) ==========
+            # These catch anything we missed with specific patterns
+            
+            # Catch any Senior + Data + Analyst combination
+            ('Senior Data Analyst', ['senior', 'data', 'analyst']),
+            
+            # Catch any Senior + Data + Engineer combination
+            ('Senior Data Engineer', ['senior', 'data', 'engineer']),
+            
+            # Catch any Senior + Data + Scientist combination
+            ('Senior Data Scientist', ['senior', 'data', 'scientist']),
+            
+            # Catch any Senior + ML/Machine Learning combination
+            ('Senior Machine Learning Engineer', ['senior', 'machine', 'learning']),
+            ('Senior Machine Learning Engineer', ['senior', 'ml']),
+            
+            # Catch any Senior + Software/Developer combination
+            ('Senior Software Engineer', ['senior', 'software']),
+            ('Senior Software Engineer', ['senior', 'engineer']),
+            
+
+            # ========== OTHER ANALYST TYPES (Add before final catch-all) ==========
+
+            ('Financial Analyst', ['financial', 'analyst']),
+            ('Financial Analyst', ['finance', 'analyst']),
+            ('Risk Analyst', ['risk', 'analyst']),
+            ('Operations Analyst', ['operations', 'analyst']),
+            ('Junior Analyst', ['junior', 'analyst']),
+
+            # Catch any Data + Analyst combination (non-senior)
+            ('Data Analyst', ['data', 'analyst']),
+
+            # Generic analyst (for anything that doesn't fit above)
+            ('Analyst', ['analyst']),
+            
+            # Catch any Data + Engineer combination (non-senior)
+            ('Data Engineer', ['data', 'engineer']),
+            
+            # Catch any Data + Scientist combination (non-senior)
+            ('Data Scientist', ['data', 'scientist']),
+            
+            # Catch any ML/Machine Learning Engineer (non-senior)
+            ('Machine Learning Engineer', ['machine', 'learning']),
+            ('Machine Learning Engineer', ['ml']),
+            
+            # Catch any AI-related roles
+            ('AI Engineer', ['ai']),
+            ('AI Engineer', ['artificial', 'intelligence']),
+            
+            # Catch any Business Analyst variations
+            ('Business Analyst', ['business', 'analyst']),
+            
+            # Catch any Software Engineer variations
+            ('Software Engineer', ['software']),
+            ('Software Engineer', ['developer']),
+            ('Software Engineer', ['engineer']),
+        ]
+        
+        # Check each category
+        for category_name, keywords in categories:
+            # Check if ALL keywords are in the title
+            if all(keyword in title_lower for keyword in keywords):
+                return category_name
+        
+        # If no match found, return "Other"
+        return 'Other'
+    
+    def _shortening_titles(self):
+        for title in self.titles:
+            self.job_title_short.append(self._categorize_job_title(title))
+    
+    def scrape_jobs(self, job_keyword, n_pages):
+        for i in range(1, n_pages+1):
+            url = f'https://www.adzuna.co.uk/jobs/search?cty=permanent&loc=86384&q={job_keyword}&p={i}'
+            browser = webdriver.Firefox(options=options)
+            browser.get(url)
+
+            titleelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
+
+            for title in titleelem_list:
+                if title.text:
+                    self.titles.append(title.text)
+
+            companyelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-company')
+
+            for company in companyelem_list:
+                self.companies.append(company.text)
+
+            sal_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-salary')
+
+            for sal in sal_list:
+                match = re.search(r'(£[\d,]+)', sal.text)
+                if match:
+                    value = match.group(1)
+                    self.salary.append(value)
+                    s_rate = self._salary_rate(value)
+                    self.salary_rate.append(s_rate)
+                    self.schedule.append("Full-time")
+                else:
+                    self.salary.append("Competitive Salary")
+                    self.salary_rate.append("yearly")
+                    self.schedule.append("Full-time")
+
+            locaelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-location')
+            for loca in locaelem_list:
+                temp = loca.text
+                res = ''
+                for i in range(len(temp)):
+                    if temp[i] == ' ' and i > 0 and temp[i-1] == ' ' or temp[i] == '+':
+                        break
+                    else:
+                        res += temp[i]
+                if res:
+                    cleaned = re.sub(r'[\r\n]+', '', res)
+                    self.locations.append(cleaned.rstrip(','))
+
+            urlelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
+            for u in urlelem_list:
+                
+                temp = u.get_attribute('href')
+                if self.urls and temp != self.urls[-1]:
+                    self.urls.append(temp)
+                elif not self.urls:
+                    self.urls.append(temp)
+                else:
+                    continue
+            for title, company, loca, u, sal in zip(self.titles, self.companies, self.locations, self.urls, self.salary):
+                print(title)
+                print(company)
+                print(loca)
+                print(u)
+                print(sal)
+                print("="*50)
+
+            browser.quit()
+            for i in range(1, n_pages+1):
+                url = f'https://www.adzuna.co.uk/jobs/search?cty=contract&loc=86384&q={job_keyword}&p={i}'
+                browser = webdriver.Firefox(options=options)
+                browser.get(url)
+
+                titleelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
+
+                for title in titleelem_list:
+                    if title.text:
+                        self.titles.append(title.text)
+
+                companyelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-company')
+
+                for company in companyelem_list:
+                    self.companies.append(company.text)
+
+                sal_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-salary')
+
+                for sal in sal_list:
+                    match = re.search(r'(£[\d,]+)', sal.text)
+                    if match:
+                        value = match.group(1)
+                        self.salary.append(value)
+                        s_rate = self._salary_rate(value)
+                        self.salary_rate.append(s_rate)
+                        self.schedule.append("Full-time")
+                    else:
+                        self.salary.append("Competitive Salary")
+                        self.salary_rate.append("yearly")
+                        self.schedule.append("Full-time")
+
+                locaelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-location')
+                for loca in locaelem_list:
+                    temp = loca.text
+                    res = ''
+                    for i in range(len(temp)):
+                        if temp[i] == ' ' and i > 0 and temp[i-1] == ' ' or temp[i] == '+':
+                            break
+                        else:
+                            res += temp[i]
+                    if res:
+                        cleaned = re.sub(r'[\r\n]+', '', res)
+                        self.locations.append(cleaned.rstrip(','))
+
+                urlelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
+                for u in urlelem_list:
+                    
+                    temp = u.get_attribute('href')
+                    if self.urls and temp != self.urls[-1]:
+                        self.urls.append(temp)
+                    elif not self.urls:
+                        self.urls.append(temp)
+                    else:
+                        continue
+                for title, company, loca, u, sal in zip(self.titles, self.companies, self.locations, self.urls, self.salary):
+                    print(title)
+                    print(company)
+                    print(loca)
+                    print(u)
+                    print(sal)
+                    print("="*50)
+                time.sleep(np.random.uniform(3, 5))
+                browser.quit()
+
+    def jd_extraction(self):
+        browser = webdriver.Firefox(options=options)
+        for u in self.urls:
+            try:
+                browser.get(u)
+                time.sleep(np.random.uniform(3, 5))
+                descelem = browser.find_element(By.CSS_SELECTOR, "div.ui-foreign-click-description")
+                if descelem:
+                    cleaned_desc = self.clean_text(descelem.text)
+                    self.job_description.append(cleaned_desc)      
+                    skills = self._extract_skills(cleaned_desc)
+                    self.job_skills.append(skills)
+                    degree = self._extract_degree(cleaned_desc)
+                    self.degree.append(degree)
+                    health_ins = self._extract_job_health_insurance_info(cleaned_desc)
+                    self.health_insurance.append(health_ins)
+                    remote = self._extract_job_work_from_home(cleaned_desc)
+                    self.work_from_home.append(remote)
+
+            except:
+                print(f"Failed to load job description for {u}")
+                self.job_description.append("Description not available")
+                self.job_skills.append("N/A")
+                self.degree.append("N/A")
+                self.health_insurance.append("N/A")
+                self.work_from_home.append("N/A")
+                time.sleep(np.random.uniform(3, 5))
+
+        browser.quit()
+
+    
 
 if __name__ == '__main__':
     scraper = AdzunaScraper()
     job_keyword = "Data Analyst"
-    page_number = 2
+    page_number = 1
     scraper.scrape_jobs(job_keyword, page_number)
+    scraper.jd_extraction()
+
+    scraper._shortening_titles()
+
+    print(len(scraper.titles))
+    print(len(scraper.companies))
+    print(len(scraper.urls))
+    print(len(scraper.job_description))
+    print(len(scraper.job_skills))
+    print(len(scraper.job_title_short))
+    print(len(scraper.locations))
+    print(len(scraper.salary))
+    print(len(scraper.degree))
+    print(len(scraper.health_insurance))
+    print(len(scraper.work_from_home))
+    print(len(scraper.schedule))
+    print(len(scraper.salary_rate))
+    
