@@ -1,4 +1,6 @@
 from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import re, unicodedata, json, pandas as pd, os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
@@ -10,12 +12,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import argparse
 options = Options()
-options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
 class IndeedScraper:
-    def __init__(self, output_filename = 'jobs_indeed', format = 'all'):
+    
+    def __init__(self, output_filename = 'indeed_jobs', format = 'all'):
         self.titles = []
         self.companies = []
         self.urls = []
@@ -609,6 +612,7 @@ class IndeedScraper:
             new_df.to_excel(excel_filename, index=False, engine='openpyxl')
             print(f'Created {excel_filename} with {len(new_df)} jobs')
 if __name__ == '__main__':
+    '''
     parser = argparse.ArgumentParser(description='Scraper CLI')
 
     parser.add_argument('--filename', default='jobs', help='Name of the output file without any extensions')
@@ -618,12 +622,14 @@ if __name__ == '__main__':
     parser.add_argument('--location', help='Enter the location', default='London')
 
     args = parser.parse_args()
+    '''
 
-    scraper = IndeedScraper(output_filename=args.filename, format=args.format)
-    job_keyword = ' '.join(args.job_keyword)
-    
+    scraper = IndeedScraper()
+    job_keyword = 'data analyst'
+    location = 'London'
+    page_ = 5
     # Scrape the jobs
-    scraper.scrape_jobs(args.location, args.number_of_pages, job_keyword)
+    scraper.scrape_jobs(location, page_, job_keyword)
     
     
     print(f"\nScraping complete! Found {len(scraper.titles)} jobs.")
@@ -634,7 +640,7 @@ if __name__ == '__main__':
 
     # Extract job descriptions
     scraper.jd_extraction()
-
+    '''
     # ADD THIS BLOCK
     if args.format == 'csv':
         scraper._save_to_csv()
@@ -649,6 +655,7 @@ if __name__ == '__main__':
         scraper._save_to_csv()
         scraper._save_to_json()
         scraper._save_to_excel()
-
+    '''
+    scraper._save_to_excel()
     print(f"\nScraping complete! Found {len(scraper.titles)} jobs.")
     print(f'Total job descriptions - {len(scraper.job_description)}, Jobs : {scraper.job_description}')

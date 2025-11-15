@@ -16,7 +16,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
 class CVScraper:
-    def __init__(self, output_filename = 'linkedIn_jobs', format = 'all'):
+    def __init__(self, output_filename = 'CVlibrary_jobs', format = 'all'):
         self.titles = []
         self.companies = []
         self.urls = []
@@ -603,6 +603,7 @@ class CVScraper:
        
         
 if __name__ == '__main__':
+    '''
     parser = argparse.ArgumentParser(description='Scraper CLI')
 
     parser.add_argument('--filename', default='jobs', help='Name of the output file without any extensions')
@@ -610,7 +611,8 @@ if __name__ == '__main__':
     parser.add_argument('--number_of_pages', type=int, default=1, help='Enter the number of pages you want to scrape')
     parser.add_argument('--format', choices=['csv', 'json', 'excel', 'pandas', 'all'], default='all', help='Output format')
     args = parser.parse_args()
-    scraper = CVScraper(output_filename=args.filename, format=args.format)
+    '''
+    scraper = CVScraper()
     
     
     def slugify(text):
@@ -625,15 +627,16 @@ if __name__ == '__main__':
         # Remove leading/trailing hyphens
         text = text.strip('-')
         return text
+    job_keyword = 'data-analyst'
+    #job_keyword = slugify(' '.join(temp))
     
-    job_keyword = slugify(' '.join(args.job_keyword))
-    
-    n_pages = args.number_of_pages
+    #n_pages = args.number_of_pages
+    n_pages = 5
     scraper.scrape_jobs(job_keyword=job_keyword, n_pages=n_pages)
 
     scraper.jd_extraction()
     scraper._shortening_titles()
-    
+    '''
     if args.format == 'csv':
         scraper._save_to_csv()
     elif args.format == 'json':
@@ -647,5 +650,7 @@ if __name__ == '__main__':
         scraper._save_to_csv()
         scraper._save_to_json()
         scraper._save_to_excel()
+        '''
+    scraper._save_to_excel()
 
     print(f"\nScraping complete! Found {len(scraper.titles)} jobs.")

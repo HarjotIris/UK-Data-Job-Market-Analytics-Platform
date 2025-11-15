@@ -379,10 +379,8 @@ class AdzunaScraper:
                 match = re.search(r'(£[\d,]+)', sal.text)
                 if match:
                     value = match.group(1)
-                    if value[1].isdigit():
-                        self.salary.append(value[0] + int(value[1:]))
-                    else:
-                        self.salary.append(value)
+                    value = value.replace(',', '')
+                    self.salary.append(value)
                     s_rate = self._salary_rate(value)
                     self.salary_rate.append(s_rate)
                     self.schedule.append("Full-time")
@@ -423,69 +421,7 @@ class AdzunaScraper:
                 print("="*50)
 
             browser.quit()
-            for i in range(1, n_pages+1):
-                url = f'https://www.adzuna.co.uk/jobs/search?cty=contract&loc=86384&q={job_keyword}&p={i}'
-                browser = webdriver.Firefox(options=options)
-                browser.get(url)
-
-                titleelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
-
-                for title in titleelem_list:
-                    if title.text:
-                        self.titles.append(title.text)
-
-                companyelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-company')
-
-                for company in companyelem_list:
-                    self.companies.append(company.text)
-
-                sal_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-salary')
-
-                for sal in sal_list:
-                    match = re.search(r'(£[\d,]+)', sal.text)
-                    if match:
-                        value = match.group(1)
-                        self.salary.append(value)
-                        s_rate = self._salary_rate(value)
-                        self.salary_rate.append(s_rate)
-                        self.schedule.append("Full-time")
-                    else:
-                        self.salary.append("Competitive Salary")
-                        self.salary_rate.append("yearly")
-                        self.schedule.append("Full-time")
-
-                locaelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-location')
-                for loca in locaelem_list:
-                    temp = loca.text
-                    res = ''
-                    for i in range(len(temp)):
-                        if temp[i] == ' ' and i > 0 and temp[i-1] == ' ' or temp[i] == '+':
-                            break
-                        else:
-                            res += temp[i]
-                    if res:
-                        cleaned = re.sub(r'[\r\n]+', '', res)
-                        self.locations.append(cleaned.rstrip(','))
-
-                urlelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
-                for u in urlelem_list:
-                    
-                    temp = u.get_attribute('href')
-                    if self.urls and temp != self.urls[-1]:
-                        self.urls.append(temp)
-                    elif not self.urls:
-                        self.urls.append(temp)
-                    else:
-                        continue
-                for title, company, loca, u, sal in zip(self.titles, self.companies, self.locations, self.urls, self.salary):
-                    print(title)
-                    print(company)
-                    print(loca)
-                    print(u)
-                    print(sal)
-                    print("="*50)
-                time.sleep(np.random.uniform(3, 5))
-                browser.quit()
+            
 
     def jd_extraction(self):
         browser = webdriver.Firefox(options=options)
@@ -606,7 +542,7 @@ class AdzunaScraper:
 if __name__ == '__main__':
     scraper = AdzunaScraper()
     job_keyword = "Data Analyst"
-    page_number = 2
+    page_number = 1
     scraper.scrape_jobs(job_keyword, page_number)
     scraper.jd_extraction()
 

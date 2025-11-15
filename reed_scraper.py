@@ -6,7 +6,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 
 class ReedScraper:
-    def __init__(self, output_filename = 'jobs_reed_scraper', format = ''):
+    def __init__(self, output_filename = 'jobs_reed_scraper', format = 'all'):
         self.job_skills_jones = []
         self.job_title_jones = []
         self.job_company_jones = []
@@ -633,12 +633,13 @@ class ReedScraper:
             self._save_to_csv()
             self._save_to_json()
         else:
-            self._save_to_csv()
-            self._save_to_json()
+            #self._save_to_csv()
+            #self._save_to_json()
             self._save_to_excel()
         
     
 if __name__ == '__main__':
+    '''
     parser = argparse.ArgumentParser(description='Scraper CLI')
 
     parser.add_argument('--filename', default='jobs', help='Name of the output file without any extensions')
@@ -647,10 +648,12 @@ if __name__ == '__main__':
     parser.add_argument('--format', help='Enter the format you want the output in, either csv or json or pandas or all of them', default='all', choices=['csv', 'json', 'excel', 'pandas', 'all'])
 
     args = parser.parse_args()
+    '''
 
-    scraper = ReedScraper(output_filename=args.filename, format=args.format)
-    job_keyword = ' '.join(args.job_keyword)
-    result = scraper.scrape_jobs(job_keyword, args.number_of_pages)
+    job_keyword = 'data analyst'
+    number_of_pages = 3
+    scraper = ReedScraper()
+    result = scraper.scrape_jobs(job_keyword, number_of_pages)
 
     print(result)
 

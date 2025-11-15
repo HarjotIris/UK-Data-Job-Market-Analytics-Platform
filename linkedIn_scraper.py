@@ -640,20 +640,24 @@ class LinkedInScraper:
 
         
 if __name__ == '__main__':
+    '''
     parser = argparse.ArgumentParser(description='Scraper CLI')
 
     parser.add_argument('--filename', default='jobs', help='Name of the output file without any extensions')
     parser.add_argument('--job_keyword', nargs='+', required=True, help='Enter the job keyword you want to search within quotes')
     parser.add_argument('--format', choices=['csv', 'json', 'excel', 'pandas', 'all'], default='all', help='Output format')
     args = parser.parse_args()
-    scraper = LinkedInScraper(output_filename=args.filename, format=args.format)
-    job_keyword = ' '.join(args.job_keyword)
+    '''
+    scraper = LinkedInScraper()
+    #job_keyword = ' '.join(args.job_keyword)
+    job_keyword = 'data+analyst'
     scraper.scrape_jobs(job_keyword=job_keyword)
 
     
 
     scraper.jd_extraction()
     scraper._shortening_titles()
+    '''
     
     if args.format == 'csv':
         scraper._save_to_csv()
@@ -665,9 +669,11 @@ if __name__ == '__main__':
         scraper._save_to_csv()
         scraper._save_to_json()
     else:  # 'all'
-        scraper._save_to_csv()
-        scraper._save_to_json()
+        #scraper._save_to_csv()
+        #scraper._save_to_json()
         scraper._save_to_excel()
+    '''  
+    scraper._save_to_excel()
 
     print(f"\nScraping complete! Found {len(scraper.titles)} jobs.")
 
