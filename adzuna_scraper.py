@@ -15,7 +15,7 @@ options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) App
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 class AdzunaScraper:
-    def __init__(self, output_filename = 'linkedIn_jobs', format = 'all'):
+    def __init__(self, output_filename = 'adzuna_jobs', format = 'all'):
         self.titles = []
         self.companies = []
         self.urls = []
@@ -379,7 +379,10 @@ class AdzunaScraper:
                 match = re.search(r'(£[\d,]+)', sal.text)
                 if match:
                     value = match.group(1)
-                    self.salary.append(value)
+                    if value[1].isdigit():
+                        self.salary.append(value[0] + int(value[1:]))
+                    else:
+                        self.salary.append(value)
                     s_rate = self._salary_rate(value)
                     self.salary_rate.append(s_rate)
                     self.schedule.append("Full-time")
@@ -514,12 +517,96 @@ class AdzunaScraper:
 
         browser.quit()
 
-    
+    def _save_to_csv(self):
+        import csv
+        try:
+            with open(self.output_filename + '.csv', 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Title', 'Title_Short' 'Company', 'Location', 'URL', 'Job Description', 'Skills', 'Salary', 'Job_Health_Insurance', 'Degree', 'Remote Work', 'Job_via', 'Job_Schedule', 'Salary_rate', 'City'])
+                for title, title_short, company, loca, u, desc, skills, salary, hinsurance, degree, remote, schedule, rate in zip(self.titles, self.job_title_short, self.companies, self.locations, self.urls, self.job_description, self.job_skills, self.salary, self.health_insurance, self.degree, self.work_from_home, self.schedule, self.salary_rate):
+                    writer.writerow([
+                        title.strip(),
+                        title_short.strip(),
+                        company.strip(),
+                        loca.strip(),
+                        u.strip(),
+                        desc.strip(),
+                        skills.strip(),
+                        salary.strip(),
+                        hinsurance.strip(),
+                        degree.strip(),
+                        remote.strip(),
+                        'Adzuna',
+                        schedule.strip(),
+                        rate.strip(),
+                        'London'
+                    ])
+            print(f"Saved to {self.output_filename}")
+        except Exception as e:
+            print(f'Error saving to csv: {e}')
+
+    def _save_to_json(self):
+        data = []
+        json_filename = self.output_filename + '.json'
+        for title, title_short, company, loca, u, desc, skills, salary, hinsurance, degree, remote, schedule, rate in zip(self.titles, self.job_title_short, self.companies, self.locations, self.urls, self.job_description, self.job_skills, self.salary, self.health_insurance, self.degree, self.work_from_home, self.schedule, self.salary_rate):
+            data.append({
+                'title': title.strip(),
+                'title_short': title_short.strip(),
+                'company': company.strip(),
+                'locations': loca.strip(),
+                'job_url': u.strip(),
+                'job_description': desc.strip(),
+                'skills': skills.strip(),
+                'salary': salary.strip(),
+                'health_insurancce': hinsurance.strip(),
+                'degree': degree.strip(),
+                'work_from_home': remote.strip(),
+                'job_via': 'Adzuna',
+                'schedule': schedule.strip(),
+                'salary_rate': rate.strip(),
+                'city': 'London'
+                
+            })
+        
+        with open(json_filename, 'w') as f:
+            json.dump(data, f, indent=4)
+        print(f"Saved to {json_filename}")
+
+    def _save_to_excel(self):
+        excel_filename = self.output_filename + '.xlsx'
+        
+        new_df = pd.DataFrame({
+            'Title': [title.strip() for title in self.titles],
+            'Title_Short':[st.strip() for st in self.job_title_short],
+            'Company': [company.strip() for company in self.companies],
+            'Location': [loca.strip() for loca in self.locations],
+            'URL': [url.strip() for url in self.urls],
+            'Job Description': [desc.strip() for desc in self.job_description],
+            'Skills': [skills.strip() for skills in self.job_skills],
+            'Salary': [sal.strip() for sal in self.salary],
+            'Job_Health_Insurance': [j.strip() for j in self.health_insurance],
+            'Degree': [d.strip() for d in self.degree],
+            'Remote Work': [r.strip() for r in self.work_from_home],
+            'Job_via': 'Adzuna',
+            'Job_Schedule': [js.strip() for js in self.schedule],
+            'Salary_rate': [rate.strip() for rate in self.salary_rate],
+            'City': 'London'
+        })
+        
+        if os.path.exists(excel_filename):
+            existing_df = pd.read_excel(excel_filename, engine='openpyxl')
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            combined_df = combined_df.drop_duplicates(subset=['Title', 'Company'], keep='first')
+            combined_df.to_excel(excel_filename, index=False, engine='openpyxl')
+            print(f'Appended to {excel_filename}. Total jobs: {len(combined_df)}')
+        else:
+            new_df.to_excel(excel_filename, index=False, engine='openpyxl')
+            print(f'Created {excel_filename} with {len(new_df)} jobs')
 
 if __name__ == '__main__':
     scraper = AdzunaScraper()
     job_keyword = "Data Analyst"
-    page_number = 1
+    page_number = 2
     scraper.scrape_jobs(job_keyword, page_number)
     scraper.jd_extraction()
 
@@ -538,4 +625,6 @@ if __name__ == '__main__':
     print(len(scraper.work_from_home))
     print(len(scraper.schedule))
     print(len(scraper.salary_rate))
-    
+    scraper._save_to_csv()
+    scraper._save_to_json()
+    scraper._save_to_excel()    
