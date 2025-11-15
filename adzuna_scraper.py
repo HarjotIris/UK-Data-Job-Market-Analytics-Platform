@@ -542,7 +542,7 @@ class AdzunaScraper:
 if __name__ == '__main__':
     scraper = AdzunaScraper()
     job_keyword = "Data Analyst"
-    page_number = 1
+    page_number = 50
     scraper.scrape_jobs(job_keyword, page_number)
     scraper.jd_extraction()
 

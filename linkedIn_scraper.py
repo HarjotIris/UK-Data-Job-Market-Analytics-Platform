@@ -413,7 +413,7 @@ class LinkedInScraper:
         # Scroll until button is visible
         see_more_button = scroll_until_button_visible(browser)
 
-        for i in range(1): # can do more than 10 if you want more jobs, this was approx 180 jobs, there were 9k total and we will get there, believe
+        for i in range(200): # can do more than 10 if you want more jobs, this was approx 180 jobs, there were 9k total and we will get there, believe
             if see_more_button:
                 # Click the button if you want to load more jobs
                 see_more_button.click()
