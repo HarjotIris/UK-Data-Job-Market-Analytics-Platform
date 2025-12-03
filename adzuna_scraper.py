@@ -15,7 +15,7 @@ options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) App
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 class AdzunaScraper:
-    def __init__(self, output_filename = 'adzuna_jobs', format = 'all'):
+    def __init__(self, output_filename = 'adzuna_jobs_page_20', format = 'all'):
         self.titles = []
         self.companies = []
         self.urls = []
@@ -357,11 +357,12 @@ class AdzunaScraper:
             self.job_title_short.append(self._categorize_job_title(title))
     
     def scrape_jobs(self, job_keyword, n_pages):
-        for i in range(1, n_pages+1):
-            url = f'https://www.adzuna.co.uk/jobs/search?cty=permanent&loc=86384&q={job_keyword}&p={i}'
+        for i in range(20, 21):
+            url = f'https://www.adzuna.co.uk/jobs/search?adv=1&loc=86384&pp=50&sb=date&sd=down&qwd=data%20analyst&p={i}'
+            #https://www.adzuna.co.uk/jobs/search?adv=1&loc=86384&pp=50&sb=date&sd=down&qwd=data%20analyst&p=2
             browser = webdriver.Firefox(options=options)
             browser.get(url)
-
+            time.sleep(np.random.uniform(19, 67))
             titleelem_list = browser.find_elements(By.CSS_SELECTOR, 'a[data-js="jobLink"]')
 
             for title in titleelem_list:
@@ -371,7 +372,10 @@ class AdzunaScraper:
             companyelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-company')
 
             for company in companyelem_list:
-                self.companies.append(company.text)
+                if company.text and company.text[0] != " " and company.text[0] != "":
+                        self.companies.append(company.text)
+                else:
+                        self.companies.append('No company')
 
             sal_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-salary')
 
@@ -381,13 +385,18 @@ class AdzunaScraper:
                     value = match.group(1)
                     value = value.replace(',', '')
                     self.salary.append(value)
-                    s_rate = self._salary_rate(value)
+                    s_rate = self._salary_rate(sal.text)
                     self.salary_rate.append(s_rate)
                     self.schedule.append("Full-time")
                 else:
                     self.salary.append("Competitive Salary")
                     self.salary_rate.append("yearly")
                     self.schedule.append("Full-time")
+            # ensure all lists have same length
+            while len(self.salary) < len(self.titles):
+                self.salary.append("Competitive Salary")
+                self.salary_rate.append("yearly")
+                self.schedule.append("Full-time")
 
             locaelem_list = browser.find_elements(By.CSS_SELECTOR, 'div.ui-location')
             for loca in locaelem_list:
@@ -428,7 +437,7 @@ class AdzunaScraper:
         for u in self.urls:
             try:
                 browser.get(u)
-                time.sleep(np.random.uniform(3, 5))
+                time.sleep(np.random.uniform(5, 10))
                 descelem = browser.find_element(By.CSS_SELECTOR, "div.ui-foreign-click-description")
                 if descelem:
                     cleaned_desc = self.clean_text(descelem.text)
@@ -561,6 +570,6 @@ if __name__ == '__main__':
     print(len(scraper.work_from_home))
     print(len(scraper.schedule))
     print(len(scraper.salary_rate))
-    scraper._save_to_csv()
-    scraper._save_to_json()
+    #scraper._save_to_csv()
+    #scraper._save_to_json()
     scraper._save_to_excel()    

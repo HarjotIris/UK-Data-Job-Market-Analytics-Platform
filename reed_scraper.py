@@ -651,7 +651,7 @@ if __name__ == '__main__':
     '''
 
     job_keyword = 'data analyst'
-    number_of_pages = 50
+    number_of_pages = 45
     scraper = ReedScraper()
     result = scraper.scrape_jobs(job_keyword, number_of_pages)
 

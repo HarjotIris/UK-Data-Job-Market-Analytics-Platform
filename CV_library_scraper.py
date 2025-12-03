@@ -631,7 +631,7 @@ if __name__ == '__main__':
     #job_keyword = slugify(' '.join(temp))
     
     #n_pages = args.number_of_pages
-    n_pages = 50
+    n_pages = 11
     scraper.scrape_jobs(job_keyword=job_keyword, n_pages=n_pages)
 
     scraper.jd_extraction()

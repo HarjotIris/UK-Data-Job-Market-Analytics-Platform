@@ -413,7 +413,7 @@ class LinkedInScraper:
         # Scroll until button is visible
         see_more_button = scroll_until_button_visible(browser)
 
-        for i in range(200): # can do more than 10 if you want more jobs, this was approx 180 jobs, there were 9k total and we will get there, believe
+        for i in range(100): # can do more than 10 if you want more jobs, this was approx 180 jobs, there were 9k total and we will get there, believe
             if see_more_button:
                 # Click the button if you want to load more jobs
                 see_more_button.click()
@@ -423,7 +423,10 @@ class LinkedInScraper:
             textelem = browser.find_elements(By.CSS_SELECTOR, 'h3.base-search-card__title')
 
             for elem in textelem:
-                self.titles.append(elem.text)
+                if elem.text:
+                    self.titles.append(elem.text)
+                else:
+                    self.titles.append('No title')
                 
         except:
             textelem = []
@@ -432,7 +435,10 @@ class LinkedInScraper:
             companyelem = browser.find_elements(By.CSS_SELECTOR, 'h4.base-search-card__subtitle')
 
             for elem in companyelem:
-                self.companies.append(elem.text)
+                if elem.text:
+                    self.companies.append(elem.text)
+                else:
+                    self.companies.append('No company')
         except:
             companyelem = []
 
@@ -440,7 +446,10 @@ class LinkedInScraper:
             locaelem = browser.find_elements(By.CSS_SELECTOR, 'span.job-search-card__location')
 
             for elem in locaelem:
-                self.locations.append(elem.text)
+                if elem.text:
+                    self.locations.append(elem.text)
+                else:
+                    self.locations.append("No location")
         except:
             locaelem = []
 
@@ -448,7 +457,10 @@ class LinkedInScraper:
             urlelem = browser.find_elements(By.CSS_SELECTOR, 'a.base-card__full-link')
 
             for u in urlelem:
-                self.urls.append(u.get_attribute('href'))
+                if u.get_attribute('href'):
+                    self.urls.append(u.get_attribute('href'))
+                else:
+                    self.urls.append('No url')
         except:
             urlelem = []
 
@@ -528,7 +540,6 @@ class LinkedInScraper:
                 try:
                     sal = browser.find_element(By.CSS_SELECTOR, "div.salary.compensation__salary")
                     sal_text = sal.text
-                    print(sal_text)
                     self.salary.append(sal_text)
                     s_rate = self._salary_rate(sal_text)
                     self.salary_rate.append(s_rate)
@@ -539,7 +550,6 @@ class LinkedInScraper:
                 try:
                     schedule = browser.find_elements(By.CSS_SELECTOR, "span.description__job-criteria-text.description__job-criteria-text--criteria")
                     schedule_text = schedule[1].text
-                    print(schedule_text)
                     self.schedule.append(schedule_text)
                 except:
                     self.schedule.append("Full-time")
@@ -557,7 +567,7 @@ class LinkedInScraper:
         try:
             with open(self.output_filename + '.csv', 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['Title', 'Title_Short' 'Company', 'Location', 'URL', 'Job Description', 'Skills', 'Salary', 'Job_Health_Insurance', 'Degree', 'Remote Work', 'Job_via', 'Job_Schedule', 'Salary_rate', 'City'])
+                writer.writerow(['Title', 'Title_Short', 'Company', 'Location', 'URL', 'Job Description', 'Skills', 'Salary', 'Job_Health_Insurance', 'Degree', 'Remote Work', 'Job_via', 'Job_Schedule', 'Salary_rate', 'City'])
                 for title, title_short, company, loca, u, desc, skills, salary, hinsurance, degree, remote, schedule, rate in zip(self.titles, self.job_title_short, self.companies, self.locations, self.urls, self.job_description, self.job_skills, self.salary, self.health_insurance, self.degree, self.work_from_home, self.schedule, self.salary_rate):
                     writer.writerow([
                         title.strip(),
@@ -674,6 +684,19 @@ if __name__ == '__main__':
         scraper._save_to_excel()
     '''  
     scraper._save_to_excel()
+    print(len(scraper.titles))
+    print(len(scraper.companies))
+    print(len(scraper.urls))
+    print(len(scraper.job_description))
+    print(len(scraper.job_skills))
+    print(len(scraper.job_title_short))
+    print(len(scraper.locations))
+    print(len(scraper.salary))
+    print(len(scraper.degree))
+    print(len(scraper.health_insurance))
+    print(len(scraper.work_from_home))
+    print(len(scraper.schedule))
+    print(len(scraper.salary_rate))
 
     print(f"\nScraping complete! Found {len(scraper.titles)} jobs.")
 

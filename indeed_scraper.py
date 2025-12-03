@@ -627,7 +627,7 @@ if __name__ == '__main__':
     scraper = IndeedScraper()
     job_keyword = 'data analyst'
     location = 'London'
-    page_ = 5
+    page_ = 25
     # Scrape the jobs
     scraper.scrape_jobs(location, page_, job_keyword)
     
